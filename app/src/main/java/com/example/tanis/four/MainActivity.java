@@ -1,12 +1,11 @@
 package com.example.tanis.four;
 
 import android.content.Intent;
-import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.provider.AlarmClock;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.text.format.Formatter;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -17,12 +16,21 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
-import java.util.concurrent.TimeUnit;
 
-import static android.os.SystemClock.sleep;
+import ru.yandex.speechkit.Error;
+import ru.yandex.speechkit.Recognizer;
+import ru.yandex.speechkit.SpeechKit;
+import ru.yandex.speechkit.Synthesis;
+import ru.yandex.speechkit.Vocalizer;
+import ru.yandex.speechkit.VocalizerListener;
+import ru.yandex.speechkit.gui.RecognizerActivity;
 
-public class MainActivity extends AppCompatActivity {
 
+
+public class MainActivity extends AppCompatActivity implements VocalizerListener {
+
+    public final static int REQUEST_COMMAND = 1;
+    private Vocalizer vocalizer;
     EditText msg;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,22 +46,64 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
 
-                String _msg = msg.getText().toString();
-                MyClientTask myClientTask = new MyClientTask(_msg);
-                myClientTask.execute();
+                // RecognizerActivity myVerySmartRecognizer = new RecognizerActivity();
+                SpeechKit.getInstance().configure(getApplicationContext(), "59a9449d-303a-4561-a413-845f11304c4f");
 
+                RecognizerActivity bestRecognizerEver = new RecognizerActivity();
+                Intent intent = new Intent(MainActivity.this, RecognizerActivity.class);
+                intent.putExtra("EXTRA_LANGUAGE", Recognizer.Language.ENGLISH);
+                intent.putExtra("EXTRA_MODEL", Recognizer.Model.NOTES);
 
-
-
-//
-
-
-//
-////                msg.setText(ip);
+                startActivityForResult(intent, REQUEST_COMMAND);
             }
         });
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        switch(requestCode) {
+            case REQUEST_COMMAND: {
+                String command = data.getStringExtra(RecognizerActivity.EXTRA_RESULT);
+                // msg.setText(command);
+                MyClientTask myClientTask = new MyClientTask(command);
+                myClientTask.execute();
+                break;
+            }
+
+        }
+    }
+
+    private void resetVocalizer() {
+        if (vocalizer != null) {
+            vocalizer.cancel();
+            vocalizer = null;
+        }
+    }
+
+    @Override
+    public void onSynthesisBegin(Vocalizer vocalizer) {
+
+    }
+
+    @Override
+    public void onSynthesisDone(Vocalizer vocalizer, Synthesis synthesis) {
+
+    }
+
+    @Override
+    public void onPlayingBegin(Vocalizer vocalizer) {
+
+    }
+
+    @Override
+    public void onPlayingDone(Vocalizer vocalizer) {
+
+    }
+
+    @Override
+    public void onVocalizerError(Vocalizer vocalizer, Error error) {
+        resetVocalizer();
+    }
 
     public class MyClientTask extends AsyncTask<Void, Void, Void> {
 
@@ -76,11 +126,7 @@ public class MainActivity extends AppCompatActivity {
 
                 ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
                 ObjectInputStream input = new ObjectInputStream(socket.getInputStream());
-
-    /*
-     * notice:
-     * inputStream.read() will block if no data return
-     */     try {
+            try {
                     output.flush();
                     output.writeObject(text);
                     while (true) {
@@ -119,28 +165,26 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         protected void onPostExecute(Void result) {
-            msg.setText(response);
+            if (TextUtils.isEmpty(response)) {
+                //Toast.makeText(getContext(), "Write smth to be vocalized!", Toast.LENGTH_SHORT).show();
+            } else {
+                // Reset the current vocalizer.
+                resetVocalizer();
+                vocalizer = Vocalizer.createVocalizer(Vocalizer.Language.RUSSIAN, response, true, Vocalizer.Voice.ZAHAR);
+                vocalizer.setListener(MainActivity.this);
+                vocalizer.start();
+            }
+
+            //msg.setText(response);
             String[] com = text.split(" ");
             Integer minutes=null;
             Integer hours=null;
-            Boolean t=false;
-            //проверяем корректность введённых данных и, если всё хорошо, получаем реакцию из таблицы
-//            if(com.length==2)
-//            {
-//                if(com[0].equals("alarm")) {
-//                    if(com[2].equals("on")) {
-//                        t=true;
-//                        String [] time = com[1].split(":");
-//                        if(time.length==2) {
-//                            try {
-//                                hours = new Double(time[0]).intValue();
-//                                minutes = new Double(time[1]).intValue();
-//
-//                            }catch (Exception e){}}}}}
-//
-            String [] time = com[1].split(":");
-            hours = new Double(time[0]).intValue();
-            minutes = new Double(time[1]).intValue();
+
+            if (com.length==3)
+            {
+                hours = new Double(com[1]).intValue();
+                minutes = new Double(com[2]).intValue();
+            }
 
             Intent i = new Intent(AlarmClock.ACTION_SET_ALARM);
 
@@ -148,11 +192,6 @@ public class MainActivity extends AppCompatActivity {
                 i.putExtra(AlarmClock.EXTRA_HOUR, hours);
                 i.putExtra(AlarmClock.EXTRA_MINUTES, minutes );
 
-//            try {
-//                TimeUnit.SECONDS.sleep(5);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
             startActivity(i);
 
 

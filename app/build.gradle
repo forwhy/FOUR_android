@@ -19,6 +19,7 @@ android {
 }
 
 dependencies {
+    compile 'com.yandex.android:speechkit:2.5.0'
     compile 'joda-time:joda-time:2.9.9'
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation 'com.android.support:appcompat-v7:26.1.0'
